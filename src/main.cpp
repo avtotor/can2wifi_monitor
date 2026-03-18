@@ -4,7 +4,6 @@
 #include "display.h"
 
 #include <windows.h>
-#include <conio.h>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -62,7 +61,6 @@ int main(int argc, char* argv[]) {
     Display display;
     display.init();
 
-    bool paused = false;
     ULONGLONG lastKeepalive = 0;
     ULONGLONG lastDisplay = 0;
     ULONGLONG lastConnectAttempt = 0;
@@ -82,7 +80,7 @@ int main(int argc, char* argv[]) {
                 // Try UDP discovery once
                 if (!discoveryDone) {
                     statusMsg = "UDP discovery on port 17222...";
-                    display.render(conn, parser, store, paused, statusMsg);
+                    display.render(conn, parser, store, statusMsg);
                     std::string foundIp;
                     if (Connection::discover(foundIp, 2000)) {
                         targetIp = foundIp;
@@ -91,24 +89,20 @@ int main(int argc, char* argv[]) {
                         statusMsg = "UDP discovery failed, using default " + targetIp;
                     }
                     discoveryDone = true;
-                    display.render(conn, parser, store, paused, statusMsg);
+                    display.render(conn, parser, store, statusMsg);
                 }
 
                 char msg[128];
                 snprintf(msg, sizeof(msg), "TCP connect to %s:%d (attempt #%d)...",
                          targetIp.c_str(), TELNET_PORT, connectAttempts);
                 statusMsg = msg;
-                display.render(conn, parser, store, paused, statusMsg);
+                display.render(conn, parser, store, statusMsg);
 
                 if (conn.connectTcp(targetIp, TELNET_PORT)) {
                     parser.reset();
                     std::string initErr = sendInitCommands(conn);
                     lastKeepalive = now;
-                    if (initErr.empty()) {
-                        statusMsg = "Connected! Sent init commands.";
-                    } else {
-                        statusMsg = "INIT FAIL: " + initErr;
-                    }
+                    statusMsg = initErr.empty() ? "Connected! Sent init commands." : "INIT FAIL: " + initErr;
                     connectAttempts = 0;
                 } else {
                     int err = WSAGetLastError();
@@ -116,10 +110,6 @@ int main(int argc, char* argv[]) {
                              err, RECONNECT_MS / 1000);
                     statusMsg = msg;
                 }
-            }
-        } else {
-            if (!statusMsg.empty() && statusMsg.find("Connected") == 0) {
-                // Clear status after a while when connected
             }
         }
 
@@ -137,10 +127,7 @@ int main(int argc, char* argv[]) {
 
         // --- Process parsed frames ---
         while (parser.hasFrame()) {
-            ParsedFrame f = parser.popFrame();
-            if (!paused) {
-                store.update(f);
-            }
+            store.update(parser.popFrame());
         }
 
         // --- Keepalive ---
@@ -154,31 +141,8 @@ int main(int argc, char* argv[]) {
         // --- Display update (10 Hz) ---
         if (now - lastDisplay >= DISPLAY_INTERVAL_MS) {
             store.calculateRates();
-            display.render(conn, parser, store, paused, statusMsg);
+            display.render(conn, parser, store, statusMsg);
             lastDisplay = now;
-        }
-
-        // --- Keyboard input ---
-        while (_kbhit()) {
-            int ch = _getch();
-            switch (ch | 0x20) {  // tolower
-            case 'q':
-                g_quit = true;
-                break;
-            case 'p':
-                paused = !paused;
-                break;
-            case 'c':
-                store.clear();
-                break;
-            case 'r':
-                conn.disconnect();
-                lastConnectAttempt = 0;
-                discoveryDone = false;
-                connectAttempts = 0;
-                statusMsg = "Reconnecting...";
-                break;
-            }
         }
 
         Sleep(1);
