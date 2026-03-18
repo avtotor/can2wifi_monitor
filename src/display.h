@@ -11,7 +11,7 @@ public:
 
     void init();
     void render(const Connection& conn, const GvretParser& parser,
-                const FrameStore& store, bool paused,
+                const FrameStore& store,
                 const std::string& statusMsg = "");
 
 private:
