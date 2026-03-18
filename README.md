@@ -185,20 +185,20 @@ int n = recv(sock_, buf, maxLen, 0);
 ### Конечный автомат парсера
 
 ```
-         0xF1               байт команды
-IDLE ──────────► GET_COMMAND ──────────────────────────────────┐
-  ▲                                                            │
+0xF1             байт команды
+IDLE ──────────► GET_COMMAND ─────────────────────────────────┐
+  ▲                                                           │
   │               0x00 → READ_CAN_FRAME                       │
-  │               0x01 → READ_TIME_SYNC   (4 байта)           │
+  │               0x01 → READ_TIME_SYNC      (4 байта)        │
   │               0x02 → SKIP_BYTES (2)                       │
   │               0x03 → SKIP_BYTES (15)                      │
-  │               0x06 → READ_CANBUS_PARAMS (10 байт)         │
-  │               0x07 → READ_DEV_INFO    (6 байт)            │
-  │               0x09 → READ_KEEPALIVE   (2 байта)           │
-  │               0x0C → READ_NUMBUSES    (1 байт)            │
-  │               0x0D → READ_EXT_BUSES   (15 байт)           │
+  │               0x06 → READ_CANBUS_PARAMS  (10 байт)        │
+  │               0x07 → READ_DEV_INFO       (6 байт)         │
+  │               0x09 → READ_KEEPALIVE      (2 байта)        │
+  │               0x0C → READ_NUMBUSES       (1 байт)         │
+  │               0x0D → READ_EXT_BUSES      (15 байт)        │
   │               другое → IDLE                               │
-  │                                                            │
+  │                                                           │
   └───────── по завершении любого состояния ──────────────────┘
 ```
 
