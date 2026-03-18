@@ -59,7 +59,7 @@ std::string Display::formatUptime(ULONGLONG ms) {
 }
 
 void Display::render(const Connection& conn, const GvretParser& parser,
-                     const FrameStore& store, bool paused,
+                     const FrameStore& store,
                      const std::string& statusMsg) {
     int width = getConsoleWidth();
     int height = getConsoleHeight();
@@ -73,7 +73,6 @@ void Display::render(const Connection& conn, const GvretParser& parser,
 
     // Title
     printf(BOLD CYAN " CAN Monitor v1.0" RESET);
-    if (paused) printf(BOLD YELLOW "  [PAUSED]" RESET);
     printf(CLR_EOL "\n");
 
     // Separator
@@ -124,8 +123,7 @@ void Display::render(const Connection& conn, const GvretParser& parser,
 
     // Frame rows
     int headerLines = 9;  // lines used above (including diagnostic line)
-    int footerLines = 2;  // separator + hotkeys
-    int maxRows = height - headerLines - footerLines;
+    int maxRows = height - headerLines;
     if (maxRows < 1) maxRows = 1;
 
     int row = 0;
@@ -163,14 +161,8 @@ void Display::render(const Connection& conn, const GvretParser& parser,
         row++;
     }
 
-    // Clear remaining rows
+    // Clear remaining rows to end of screen
     printf(CLR_EOS);
-
-    // Move to bottom for hotkeys
-    // Use absolute positioning: go to line (height-1)
-    printf(ESC "%d;1H", height - 1);
-    printf(" %s" CLR_EOL "\n", line.c_str());
-    printf(" [Q]uit  [P]ause  [C]lear  [R]econnect" CLR_EOL);
 
     fflush(stdout);
 }
