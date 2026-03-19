@@ -181,30 +181,20 @@ int n = recv(sock, buf, max_len, 0);
 ### Конечный автомат парсера
 
 ```mermaid
-stateDiagram-v2
-    [*] --> IDLE
+graph TD
+    IDLE -->|0xF1| GC[GET_COMMAND]
+    GC -->|другой байт| IDLE
 
-    IDLE --> GET_COMMAND : 0xF1
-    IDLE --> IDLE : другой байт
+    GC -->|0x00| A["CAN_FRAME\n9+DLC+1 б"]
+    GC -->|0x01| B["TIME_SYNC\n4 б"]
+    GC -->|"0x02/03"| C["SKIP_BYTES\n2 / 15 б"]
+    GC -->|0x06| D["BUS_PARAMS\n10 б"]
+    GC -->|0x07| E["DEV_INFO\n6 б"]
+    GC -->|0x09| F["KEEPALIVE\n2 б"]
+    GC -->|0x0C| G["NUMBUSES\n1 б"]
+    GC -->|0x0D| H["EXT_BUSES\n15 б"]
 
-    GET_COMMAND --> READ_CAN_FRAME    : 0x00
-    GET_COMMAND --> READ_TIME_SYNC    : 0x01
-    GET_COMMAND --> SKIP_BYTES        : 0x02 / 0x03
-    GET_COMMAND --> READ_CANBUS_PARAMS: 0x06
-    GET_COMMAND --> READ_DEV_INFO     : 0x07
-    GET_COMMAND --> READ_KEEPALIVE    : 0x09
-    GET_COMMAND --> READ_NUMBUSES     : 0x0C
-    GET_COMMAND --> READ_EXT_BUSES    : 0x0D
-    GET_COMMAND --> IDLE              : другой байт
-
-    READ_CAN_FRAME     --> IDLE : 9+DLC+1 байт
-    READ_TIME_SYNC     --> IDLE : 4 байта
-    SKIP_BYTES         --> IDLE : N байт
-    READ_CANBUS_PARAMS --> IDLE : 10 байт
-    READ_DEV_INFO      --> IDLE : 6 байт
-    READ_KEEPALIVE     --> IDLE : 2 байта
-    READ_NUMBUSES      --> IDLE : 1 байт
-    READ_EXT_BUSES     --> IDLE : 15 байт
+    A & B & C & D & E & F & G & H -->|готово| IDLE
 ```
 
 Диспетчеризация по байту команды:
