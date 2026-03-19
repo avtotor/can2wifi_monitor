@@ -2,36 +2,27 @@
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <cstdint>
-#include <string>
+#include <stdint.h>
+#include <stdbool.h>
 
-class Connection {
-public:
-    Connection();
-    ~Connection();
+typedef struct {
+    SOCKET sock;
+    bool connected;
+    char ip[64];
+    int port;
+    char last_error[128];
+} Connection;
 
-    static bool initWinsock();
-    static void cleanupWinsock();
+bool connection_init_winsock(void);
+void connection_cleanup_winsock(void);
 
-    bool connectTcp(const std::string& ip, int port, int timeoutMs = 2000);
-    void disconnect();
-    bool isConnected() const { return connected_; }
+void connection_init(Connection* conn);
+void connection_deinit(Connection* conn);
 
-    // Non-blocking receive. Returns bytes read, 0 if no data, -1 on error/disconnect.
-    int receive(uint8_t* buf, int maxLen);
-    bool sendData(const uint8_t* buf, int len);
+bool connection_connect_tcp(Connection* conn, const char* ip, int port, int timeout_ms);
+void connection_disconnect(Connection* conn);
 
-    const std::string& getIp() const { return ip_; }
-    int getPort() const { return port_; }
-    const std::string& lastError() const { return lastError_; }
+int  connection_receive(Connection* conn, uint8_t* buf, int max_len);
+bool connection_send(Connection* conn, const uint8_t* buf, int len);
 
-    // Listen for ESP32 UDP broadcast on port 17222, return source IP.
-    static bool discover(std::string& outIp, int timeoutMs = 3000);
-
-private:
-    SOCKET sock_;
-    bool connected_;
-    std::string ip_;
-    int port_;
-    std::string lastError_;
-};
+bool connection_discover(char* out_ip, int out_ip_size, int timeout_ms);
