@@ -1,39 +1,34 @@
 #pragma once
 
 #include "gvret_parser.h"
-#include <windows.h>
-#include <cstdint>
-#include <map>
+#include <stdint.h>
+#include <stdbool.h>
 
-struct FrameEntry {
-    uint32_t id = 0;
-    bool extended = false;
-    uint8_t bus = 0;
-    uint8_t dlc = 0;
-    uint8_t data[8] = {};
-    uint8_t prevData[8] = {};
-    uint64_t count = 0;
-    uint64_t countSnapshot = 0;
-    double rate = 0.0;
-    ULONGLONG firstSeen = 0;
-    ULONGLONG lastSeen = 0;
-    bool dataChanged = false;
-};
+#define FRAME_STORE_MAX_ENTRIES 512
 
-class FrameStore {
-public:
-    FrameStore();
+typedef struct {
+    uint32_t id;
+    bool extended;
+    uint8_t bus;
+    uint8_t dlc;
+    uint8_t data[8];
+    uint8_t prev_data[8];
+    uint64_t count;
+    uint64_t count_snapshot;
+    double rate;
+    uint64_t first_seen;
+    uint64_t last_seen;
+    bool data_changed;
+} FrameEntry;
 
-    void update(const ParsedFrame& frame);
-    void calculateRates();
-    void clear();
+typedef struct {
+    FrameEntry entries[FRAME_STORE_MAX_ENTRIES];
+    int count;
+    uint64_t total;
+    uint64_t last_rate_calc;
+} FrameStore;
 
-    uint64_t totalFrames() const { return total_; }
-    size_t uniqueIds() const { return store_.size(); }
-    const std::map<uint32_t, FrameEntry>& entries() const { return store_; }
-
-private:
-    std::map<uint32_t, FrameEntry> store_;
-    uint64_t total_ = 0;
-    ULONGLONG lastRateCalc_ = 0;
-};
+void frame_store_init(FrameStore* store);
+void frame_store_update(FrameStore* store, const ParsedFrame* frame);
+void frame_store_calculate_rates(FrameStore* store);
+void frame_store_clear(FrameStore* store);

@@ -3,22 +3,17 @@
 #include "connection.h"
 #include "gvret_parser.h"
 #include "frame_store.h"
-#include <string>
 
-class Display {
-public:
-    Display();
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
 
-    void init();
-    void render(const Connection& conn, const GvretParser& parser,
-                const FrameStore& store,
-                const std::string& statusMsg = "");
+typedef struct {
+    HANDLE h_out;
+    uint64_t start_time;
+} Display;
 
-private:
-    HANDLE hOut_;
-    ULONGLONG startTime_;
-
-    int getConsoleWidth();
-    int getConsoleHeight();
-    std::string formatUptime(ULONGLONG ms);
-};
+void display_init(Display* disp);
+void display_render(Display* disp, const Connection* conn, const GvretParser* parser,
+                    const FrameStore* store, const char* status_msg);

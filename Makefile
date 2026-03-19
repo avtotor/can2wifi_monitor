@@ -1,18 +1,18 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -O2 -Isrc
+CC     = gcc
+CFLAGS = -std=c11 -Wall -O2 -Isrc
 LDFLAGS = -lws2_32
-TARGET = can_monitor.exe
+TARGET  = can_monitor.exe
 
-SRCS = src/main.cpp src/connection.cpp src/gvret_parser.cpp src/frame_store.cpp src/display.cpp
-OBJS = $(SRCS:.cpp=.o)
+SRCS = src/main.c src/connection.c src/gvret_parser.c src/frame_store.c src/display.c
+OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(OBJS) $(TARGET)
