@@ -27,21 +27,13 @@ can_monitor.exe 192.168.4.1
 
 ## Архитектура
 
-```
-┌────────────────────────────────────────────────────────┐
-│                       main.c                           │
-│  Главный цикл (тик ~1 мс)                              │
-│                                                        │
-│  ┌────────────┐   ┌───────────────┐   ┌─────────────┐  │
-│  │ Connection │ → │  GvretParser  │ → │ FrameStore  │  │
-│  │            │   │               │   │             │  │
-│  │ TCP / UDP  │   │ Конечный      │   │ sorted arr  │  │
-│  │ Winsock2   │   │ автомат       │   │ + bin search│  │
-│  └────────────┘   └───────────────┘   └──────┬──────┘  │
-│                                              │         │
-│                                           Display      │
-│                                        (ANSI, 10 Гц)   │
-└────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph main.c ["main.c — главный цикл, тик ~1 мс"]
+        A["Connection\nTCP/UDP · Winsock2"] -->|bytes| B["GvretParser\nконечный автомат"]
+        B -->|ParsedFrame| C["FrameStore\nsorted array · 512 IDs"]
+        C -->|entries| D["Display\nANSI · 10 Гц"]
+    end
 ```
 
 | Файл | Ответственность |
@@ -68,26 +60,30 @@ can_monitor.exe 192.168.4.1
 
 ### Порядок действий за один тик
 
-```
-1. Управление соединением
-   └─ если нет соединения И прошло ≥ 3 с:
-       ├─ если IP не задан: UDP-discovery (таймаут 8 с)
-       │   ├─ успех → запомнить IP, перейти к TCP
-       │   └─ неудача → показать подсказку, повторить через 3 с
-       ├─ TCP-connect (неблокирующий, таймаут 2 с)
-       └─ отправка 4 init-команд
+```mermaid
+flowchart TD
+    Tick([тик ~1 мс]) --> ConnOk{соединение?}
 
-2. Приём данных (неблокирующий)
-   └─ recv() до 4096 байт → gvret_parser_feed_bytes()
+    ConnOk -- да --> Recv
+    ConnOk -- "нет, прошло ≥ 3с" --> HasIP{IP задан?}
 
-3. Разбор очереди парсера
-   └─ пока has_frame(): frame_store_update(pop_frame())
+    HasIP -- нет --> UDP["UDP-discovery\nтаймаут 8 с"]
+    UDP -- найден --> TCP
+    UDP -- не найден --> Tick
 
-4. Keepalive
-   └─ каждые 2 с: отправить F1 09
+    HasIP -- да --> TCP["TCP-connect\nтаймаут 2 с"]
+    TCP -- OK --> Init["4 init-команды\nE7 · F1 07 · F1 06 · F1 0C"]
+    TCP -- fail --> Tick
+    Init --> Recv
 
-5. Обновление экрана (каждые 100 мс)
-   └─ frame_store_calculate_rates() → display_render()
+    Recv["recv()\nдо 4096 байт"] --> Parse["gvret_parser_feed_bytes()"]
+    Parse --> HasFrame{has_frame?}
+    HasFrame -- да --> Update["frame_store_update()"] --> HasFrame
+    HasFrame -- нет --> KA{"≥ 2с без\nkeepalive?"}
+    KA -- да --> KASend["send F1 09"] --> Disp
+    KA -- нет --> Disp{"≥ 100мс без\nрендера?"}
+    Disp -- да --> Render["calculate_rates()\ndisplay_render()"] --> Tick
+    Disp -- нет --> Tick
 ```
 
 ---
@@ -184,16 +180,31 @@ int n = recv(sock, buf, max_len, 0);
 
 ### Конечный автомат парсера
 
-Общий поток:
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
 
-```
-                  0xF1                 байт команды            N байт данных
-  ┌──────┐  ───────────────►  ┌─────────────┐  ──────────►  ┌───────────┐
-  │ IDLE │                    │ GET_COMMAND │  (см. табл.)  │ состояние │
-  └──────┘◄───────────────────└─────────────┘               └─────┬─────┘
-     ▲       не 0xF1 (остаёмся)   │  другой байт → сразу IDLE      │
-     └────────────────────────────────────────────────────────────┘
-                                                  по завершении N байт
+    IDLE --> GET_COMMAND : 0xF1
+    IDLE --> IDLE : другой байт
+
+    GET_COMMAND --> READ_CAN_FRAME    : 0x00
+    GET_COMMAND --> READ_TIME_SYNC    : 0x01
+    GET_COMMAND --> SKIP_BYTES        : 0x02 / 0x03
+    GET_COMMAND --> READ_CANBUS_PARAMS: 0x06
+    GET_COMMAND --> READ_DEV_INFO     : 0x07
+    GET_COMMAND --> READ_KEEPALIVE    : 0x09
+    GET_COMMAND --> READ_NUMBUSES     : 0x0C
+    GET_COMMAND --> READ_EXT_BUSES    : 0x0D
+    GET_COMMAND --> IDLE              : другой байт
+
+    READ_CAN_FRAME     --> IDLE : 9+DLC+1 байт
+    READ_TIME_SYNC     --> IDLE : 4 байта
+    SKIP_BYTES         --> IDLE : N байт
+    READ_CANBUS_PARAMS --> IDLE : 10 байт
+    READ_DEV_INFO      --> IDLE : 6 байт
+    READ_KEEPALIVE     --> IDLE : 2 байта
+    READ_NUMBUSES      --> IDLE : 1 байт
+    READ_EXT_BUSES     --> IDLE : 15 байт
 ```
 
 Диспетчеризация по байту команды:
