@@ -180,37 +180,30 @@ int n = recv(sock, buf, max_len, 0);
 
 ### Конечный автомат парсера
 
+Каждый пакет — три шага:
+
 ```mermaid
-graph TD
-    IDLE -->|0xF1| GC[GET_COMMAND]
-    GC -->|другой байт| IDLE
-
-    GC -->|0x00| A["CAN_FRAME\n9+DLC+1 б"]
-    GC -->|0x01| B["TIME_SYNC\n4 б"]
-    GC -->|"0x02/03"| C["SKIP_BYTES\n2 / 15 б"]
-    GC -->|0x06| D["BUS_PARAMS\n10 б"]
-    GC -->|0x07| E["DEV_INFO\n6 б"]
-    GC -->|0x09| F["KEEPALIVE\n2 б"]
-    GC -->|0x0C| G["NUMBUSES\n1 б"]
-    GC -->|0x0D| H["EXT_BUSES\n15 б"]
-
-    A & B & C & D & E & F & G & H -->|готово| IDLE
+flowchart LR
+    A([IDLE]) -->|"① байт 0xF1"| B([GET_COMMAND])
+    B -->|"② байт команды\nсм. таблицу"| C(["состояние\nчитает N байт"])
+    C -->|"③ N байт прочитано"| A
+    B -->|другой байт| A
 ```
 
-Диспетчеризация по байту команды:
+Что происходит на шаге ②:
 
-| Команда | Следующее состояние | Читает байт |
+| Команда | Состояние | Байт данных |
 |---|---|---|
-| `0x00` | READ_CAN_FRAME | 9 + DLC + 1 (чексумма) |
+| `0x00` | READ_CAN_FRAME | 9 + DLC + 1 |
 | `0x01` | READ_TIME_SYNC | 4 |
-| `0x02` | SKIP_BYTES | 2 (цифровые входы, игнор) |
-| `0x03` | SKIP_BYTES | 15 (аналоговые входы, игнор) |
+| `0x02` | SKIP_BYTES | 2 |
+| `0x03` | SKIP_BYTES | 15 |
 | `0x06` | READ_CANBUS_PARAMS | 10 |
 | `0x07` | READ_DEV_INFO | 6 |
 | `0x09` | READ_KEEPALIVE | 2 |
 | `0x0C` | READ_NUMBUSES | 1 |
-| `0x0D` | READ_EXT_BUSES | 15 (игнор) |
-| любой другой | IDLE | — |
+| `0x0D` | READ_EXT_BUSES | 15 |
+| любой другой | → сразу IDLE | — |
 
 **Переменные состояния:**
 - `state` — текущее состояние (`GvretState`)
